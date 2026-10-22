@@ -1099,17 +1099,17 @@ function drawSky(g,b,camX,camY,t,par){var L=BG.get(b),q=Gfx.q();par=par||0;g.dra
 function drawForeground(g,b,par){if(Gfx.q()<1)return;var L=BG.get(b);g.drawImage(L.fg,-100-par*28,0,VW+200,VH);}
 
 // ===== Player: Chispa the ant =====
-var PH={RUN:165,G:1500,JV:480,DJV:430,MAXFALL:540,DASHV:460,DASHT:0.16,WJV:430,WJX:230,POGO:420,HEALT:0.9,HEALT2:0.55};
+var PH={RUN:165,G:1500,JV:480,DJV:430,MAXFALL:540,DASHV:460,DASHT:0.16,WJV:430,WJX:230,POGO:420,HEALT:0.9,HEALT2:0.55,ATKT:0.22,ATKCD:0.36,ATKBUF:0.12}; // attack: swing 0.22 s, fixed 0.36 s start-to-start cooldown (ticks through hitstop), 0.12 s press buffer
 function Player(){this.w=12;this.h=22;this.reset();}
 Player.prototype.reset=function(){this.x=0;this.y=0;this.vx=0;this.vy=0;this.face=1;this.onGround=false;this.coyote=0;this.jumpBuf=0;this.jumping=false;this.djUsed=false;this.dashUsed=false;this.dashT=0;this.dashCd=0;this.dashDir=1;
- this.wall=0;this.wallCoy=0;this.wallSide=0;this.wallLock=0;this.atkT=0;this.atkCd=0;this.atkDir='side';this.atkHit=null;this.pogoDone=false;this.recoilT=0;this.recoilV=0;this.hurtT=0;this.invT=0;
+ this.wall=0;this.wallCoy=0;this.wallSide=0;this.wallLock=0;this.atkT=0;this.atkCd=0;this.atkBuf=0;this.atkDir='side';this.atkHit=null;this.pogoDone=false;this.recoilT=0;this.recoilV=0;this.hurtT=0;this.invT=0;
  this.healT=0;this.healHeld=0;this.spitCd=0;this.dropT=0;this.dead=false;this.deathT=0;this.safeX=0;this.safeY=0;this.anim=0;this.runPh=0;this.sq=1;this.trail=[];this.landT=0;this.frozen=0;this.resting=false;};
 Player.prototype.cx=function(){return this.x+this.w/2;};Player.prototype.cy=function(){return this.y+this.h/2;};
 Player.prototype.maxHp=function(){return Game.save.maxHp+(Game.settings.assist?3:0);};
 Player.prototype.dmg=function(){return Game.save.shop.sharp?3:2;};
 Player.prototype.update=function(dt){var S=Game.save,ab=S.ab,I=Input,room=Game.room;this.anim+=dt;
  if(this.dead){this.deathT+=dt;return;}
- this.invT=Math.max(0,this.invT-dt);this.dashCd-=dt;this.atkCd-=dt;this.spitCd-=dt;this.hurtT-=dt;this.wallLock-=dt;this.recoilT-=dt;this.dropT-=dt;this.coyote-=dt;this.wallCoy-=dt;this.landT-=dt;
+ this.invT=Math.max(0,this.invT-dt);this.dashCd-=dt;this.atkCd=Math.max(0,this.atkCd-dt);this.atkBuf=Math.max(0,this.atkBuf-dt);this.spitCd-=dt;this.hurtT-=dt;this.wallLock-=dt;this.recoilT-=dt;this.dropT-=dt;this.coyote-=dt;this.wallCoy-=dt;this.landT-=dt;
  if(this.frozen>0){this.frozen-=dt;this.vx=0;this.vy=Math.min(this.vy+PH.G*dt,PH.MAXFALL);var r0=moveBody(this,room,dt);this.onGround=r0.ground||groundBelow(this,room);return;}
  if(this.resting){if(I.hit('left')||I.hit('right')||I.hit('jump')||I.hit('attack')||I.hit('dash')){this.resting=false;}else return;}
  var mx=(I.held.right?1:0)-(I.held.left?1:0);
@@ -1147,7 +1147,8 @@ Player.prototype.update=function(dt){var S=Game.save,ab=S.ab,I=Input,room=Game.r
  if(this.jumping&&!I.held.jump&&this.vy<0){this.vy*=0.45;this.jumping=false;}
  if(this.vy>=0)this.jumping=false;
  // attack
- if(I.hit('attack')&&this.atkCd<=0&&this.dashT<=0&&!healing){this.atkDir=I.held.up?'up':(I.held.down&&!this.onGround)?'down':'side';this.atkT=0.22;this.atkCd=0.36;this.atkHit=[];this.pogoDone=false;Sound.play('swing');}
+ if(I.hit('attack'))this.atkBuf=PH.ATKBUF;
+ if(this.atkBuf>0&&this.atkCd<=0&&this.dashT<=0&&!healing){this.atkBuf=0;this.atkDir=I.held.up?'up':(I.held.down&&!this.onGround)?'down':'side';this.atkT=PH.ATKT;this.atkCd=PH.ATKCD;this.atkHit=[];this.pogoDone=false;Sound.play('swing');}
  if(this.atkT>0)this.atkT-=dt;
  // move
  var wasG=this.onGround,vyPrev=this.vy;var r=moveBody(this,room,dt);
@@ -1290,7 +1291,7 @@ Player.prototype.draw=function(g){var f=this.face;if(!this.cl)this.gfxInit();
  if(this.healing){var hp=0.7+Math.sin(this.anim*18)*0.2;Glow.add(g,this.cx(),this.cy(),34,'#ffcf6a',hp);g.strokeStyle='rgba(255,220,140,'+(0.5*hp)+')';g.lineWidth=1;var rr=18-((this.healT*30)%14);g.beginPath();g.arc(this.cx(),this.cy(),Math.max(2,rr),0,7);g.stroke();Glow.emit(g,this.cx(),this.cy(),24,'#ffd27a',0.5*hp);}
  this.drawHero(g,this.cx(),this.y+this.h,f,o);g.globalAlpha=1;
  // slash crescent with trail
- if(this.atkT>0){var p=1-this.atkT/0.22,L=Game.save&&Game.save.shop.long?10:0;var head=clamp(p/0.32,0,1),tail=clamp((p-0.12)/0.55,0,1);if(head>tail+0.01){
+ if(this.atkT>0){var p=1-this.atkT/PH.ATKT,L=Game.save&&Game.save.shop.long?10:0;var head=clamp(p/0.32,0,1),tail=clamp((p-0.12)/0.55,0,1);if(head>tail+0.01){
   g.save();g.translate(this.cx(),this.cy()-1);g.scale(f,1);var rot=this.atkDir==='up'?-Math.PI/2:this.atkDir==='down'?Math.PI/2:0;g.rotate(rot);if(this.atkDir!=='side')g.scale(1,-1);
   var R=23+L,a0=-1.3,a1=1.15,cx0=6,N=14,fade=clamp((1-p)/0.45,0,1);g.globalCompositeOperation='lighter';
   var pts=[],inn=[];for(var k=0;k<=N;k++){var u=tail+(head-tail)*k/N,ang=a0+(a1-a0)*u,th=0.6+7.5*Math.pow(k/N,1.4);pts.push([cx0+Math.cos(ang)*R,Math.sin(ang)*R]);inn.push([cx0+Math.cos(ang)*(R-th),Math.sin(ang)*(R-th)]);}
@@ -1658,7 +1659,7 @@ var Game={state:'title',save:null,settings:{vol:0.8,mus:0.5,assist:false,lang:'e
  // ---------- main step ----------
  step:function(dt){this.titleT+=dt;Sound.update();
   if(this.state!=='play'){this.uiStep(dt);return true;}
-  if(FX.stop>0){FX.stop-=dt;FX.update(dt*0.2);return false;}
+  if(FX.stop>0){FX.stop-=dt;FX.update(dt*0.2);if(this.p)this.p.atkCd=Math.max(0,this.p.atkCd-dt);return false;}
   var S=this.save,p=this.p,room=this.room,I=Input;S.time+=dt;
   if(I.hit('pause')){this.state='pause';this.menu=0;this.menuStack=[];Sound.play('menu');return true;}
   if(I.hit('map')){this.state='map';Sound.play('menu');return true;}
